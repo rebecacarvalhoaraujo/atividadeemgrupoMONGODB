@@ -4,11 +4,26 @@ const Produto = require('../model/Produto');
 const { errorMonitor } = require('events');
 
 produtos.route('/')
-    .get(async (req, res) => {
+    .get(async (req, res) => {const { nome, preco, categoria } = req.query;
 
         try {
-            const response = await Produto.find();
-            res.status(200).json(response);
+            if (!nome && !preco && !categoria) {
+                const response = await Produto.find();
+                res.status(200).json(response);
+            } else {
+                const query = {};
+                if (nome) {
+                    query.nome = { $regex: nome, $options: 'i' };
+                }
+                if (preco) {
+                    query.preco = { $gte: preco };
+                }
+                if (categoria) {
+                    query.categoria = categoria;
+                }
+                const response = await Produto.find().or([query]);
+                res.status(200).json(response)
+            }
         } catch (err) {
             res.status(500).json(err);
         }
