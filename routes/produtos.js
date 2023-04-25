@@ -1,7 +1,21 @@
 const express = require('express');
 const produtos = express.Router();
 const Produto = require('../model/Produto');
-const { errorMonitor } = require('events');
+const Joi = require('joi');
+const multer = require('multer');
+const path = require('path');
+
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/');
+    },
+    filename: (req, file, cb) => {
+        cb(null, `${file.fieldname}-${Date.now()}${path.extname(file.originalname)}`);
+    },
+});
+
+const upload = multer({ storage });
 
 produtos.route('/')
     .get(async (req, res) => {
@@ -30,8 +44,49 @@ produtos.route('/')
         }
 
     })
-    .post(async (req, res) => {
+    .post(upload.single('imgProduto'), async (req, res) => {
 
+        const postSchema = Joi.object({
+            nome: Joi.string().required(),
+            descricao: Joi.string().required(),
+            quantidade: Joi.number().integer().required(),
+            preco: Joi.number().positive().required(),
+            desconto: Joi.number().min(0).max(1).optional(),
+            dataDesconto: Joi.date().iso().optional(),
+            categoria: Joi.string().required()
+        });
+
+        const { error } = postSchema.validate(req.body);
+
+        if (error) {
+            return res.status(400).json({ message: error.details[0].message });
+        }
+
+        const { nome, descricao, quantidade, preco, desconto, dataDesconto, categoria } = req.body;
+
+        try {
+            const imgProduto = req.file?.path;
+            if(!imgProduto){
+                return res.status(400).json({mensagem: "campo imagem é obrigatório"})
+            }
+
+            if (typeof desconto !== 'undefined' && typeof dataDesconto !== 'undefined') {
+                const precoComDesconto = preco - (preco * desconto);
+                const produto = new Produto({ nome, descricao, quantidade, preco, desconto, precoComDesconto, dataDesconto, categoria, imgProduto });
+                await produto.save();
+                res.status(201).json({ mensagem: "produto criado com sucesso.", produto: produto });
+            } else {
+                const produto = new Produto({ nome, descricao, quantidade, preco, categoria, imgProduto });
+                await produto.save();
+                res.status(201).json({ mensagem: "produto criado com sucesso.", produto: produto });
+            }
+        } catch (err) {
+            console.log(err);
+            res.status(500).json(err);
+        }
+
+    })
+    .put(async (req, res) => {
         const putSchema = Joi.object({
             id: Joi.string().required(),
             nome: Joi.string().required(),
@@ -62,35 +117,10 @@ produtos.route('/')
             if (typeof desconto !== 'undefined' && typeof dataDesconto !== 'undefined') {
                 const precoComDesconto = preco - (preco * desconto);
                 const response = await Produto.findByIdAndUpdate(id, { nome, descricao, quantidade, preco, desconto, dataDesconto, precoComDesconto, categoria, imgProduto }, { new: true })
-                res.status(200).json(response);
+                res.status(200).json({ mensagem: "produto alterado com sucesso.", produto: response });
             } else {
                 const response = await Produto.findByIdAndUpdate(id, { nome, descricao, quantidade, preco, categoria, imgProduto }, { new: true })
-                res.status(200).json(response);
-            }
-
-        } catch (err) {
-            console.log(err);
-            res.status(500).json(err);
-        }
-    })
-    .put(async (req, res) => {
-        const { id, nome, descricao, quantidade, preco, desconto, dataDesconto, categoria, imgProduto } = req.body;
-        try {
-            if (!id || !nome || !descricao || !quantidade || !preco || !categoria || !imgProduto) {
-                return res.status(400).json({ message: "Campos obrigatórios ausentes." });
-            }
-
-            const produtoEncontrado = await Produto.findById(id);
-            if (!produtoEncontrado) {
-                return res.status(404).json({ message: "produto não encontrado!" });
-            }
-
-            const response = await Produto.findByIdAndUpdate
-                (id, { nome, descricao, quantidade, preco, desconto, dataDesconto, categoria, imgProduto }, { new: true })
-            if (response) {
-                res.status(200).json(response);
-            } else {
-                res.status(404).json({ mensagem: "produto não encontrado" });
+                res.status(200).json({ mensagem: "produto alterado com sucesso.", produto: response });
             }
 
         } catch (err) {
@@ -111,12 +141,13 @@ produtos.route('/')
         }
 
         const { id } = req.body;
+
         try {
             const response = await Produto.findByIdAndRemove(id);
             if (!response) {
                 return res.status(404).json({ mensagem: "produto não encontrado" });
             }
-            res.status(200).json(response);
+            res.status(200).json({ mensagem: "produto excluido com sucesso.", produto: response });
         } catch (err) {
             res.status(500).json(err);
         }

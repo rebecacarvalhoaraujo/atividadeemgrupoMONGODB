@@ -7,6 +7,7 @@ const app = express();
 app.use(express.json());
 mongoose.connect(process.env.db_url);
 
+app.use(express.static('uploads'))
 //rotas
 app.use('/produtos', produtos);
 
