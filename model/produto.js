@@ -23,12 +23,15 @@ const Produto = model('produto',new Schema({
     dataDesconto: {
         type: Date,
     },
+    precoComDesconto:{
+        type: Number,
+    },
     categoria: {
         type: String,
         require: true,
     },
     imgProduto: {
-        type: String,
+        type: [String],
         require: true,
     }
 }));

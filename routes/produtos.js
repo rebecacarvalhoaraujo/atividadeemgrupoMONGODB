@@ -5,7 +5,6 @@ const Joi = require('joi');
 const multer = require('multer');
 const path = require('path');
 
-
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, 'uploads/');
@@ -44,7 +43,7 @@ produtos.route('/')
         }
 
     })
-    .post(upload.single('imgProduto'), async (req, res) => {
+    .post(upload.array('imgProduto', 5), async (req, res) => {
 
         const postSchema = Joi.object({
             nome: Joi.string().required(),
@@ -65,8 +64,8 @@ produtos.route('/')
         const { nome, descricao, quantidade, preco, desconto, dataDesconto, categoria } = req.body;
 
         try {
-            const imgProduto = req.file?.path;
-            if(!imgProduto){
+            const imgProduto = req.files.map(file => file.path.replace(/\\/g, '/'));
+            if(imgProduto.length === 0) {
                 return res.status(400).json({mensagem: "campo imagem é obrigatório"})
             }
 
@@ -74,11 +73,11 @@ produtos.route('/')
                 const precoComDesconto = preco - (preco * desconto);
                 const produto = new Produto({ nome, descricao, quantidade, preco, desconto, precoComDesconto, dataDesconto, categoria, imgProduto });
                 await produto.save();
-                res.status(201).json({ mensagem: "produto criado com sucesso.", produto: produto });
+                res.status(201).json(produto);
             } else {
                 const produto = new Produto({ nome, descricao, quantidade, preco, categoria, imgProduto });
                 await produto.save();
-                res.status(201).json({ mensagem: "produto criado com sucesso.", produto: produto });
+                res.status(201).json(produto);
             }
         } catch (err) {
             console.log(err);
@@ -117,10 +116,10 @@ produtos.route('/')
             if (typeof desconto !== 'undefined' && typeof dataDesconto !== 'undefined') {
                 const precoComDesconto = preco - (preco * desconto);
                 const response = await Produto.findByIdAndUpdate(id, { nome, descricao, quantidade, preco, desconto, dataDesconto, precoComDesconto, categoria, imgProduto }, { new: true })
-                res.status(200).json({ mensagem: "produto alterado com sucesso.", produto: response });
+                res.status(200).json(response);
             } else {
                 const response = await Produto.findByIdAndUpdate(id, { nome, descricao, quantidade, preco, categoria, imgProduto }, { new: true })
-                res.status(200).json({ mensagem: "produto alterado com sucesso.", produto: response });
+                res.status(200).json(response);
             }
 
         } catch (err) {
